@@ -9,7 +9,7 @@
  * au sein de chaque maille
  *
  * A prendre en compte : 
- *   - Fonctionne pour inclinaison (alpha) entre 0 et pi/2
+ *   - Fonctionne pour inclinaison (alpha) entre 0 et pi
  *   - Choisir le bon champ de mu à comparer pour le calcul du poids (le faire automatiquement mais je l'ai pas fait encore)
  */
 
@@ -296,7 +296,7 @@ static int sur_segment(double px, double py,
 /* Intersection rayon / droite en y = y0 + tan_pente*(x - x0)
    Rayon :     y = ym + tan_theta*(xm - x)
    Retourne x de l'intersection. */
-static double intersect_x(double xm, double ym, double tan_theta,
+static double intersect_V_x(double xm, double ym, double tan_theta,
                            double x0, double y0, double tan_pente) {
     /* Si tan_pente est très grand (interface quasiment verticale x=x0) */
     if (fabs(tan_pente) > 1e14) {
@@ -308,6 +308,20 @@ static double intersect_x(double xm, double ym, double tan_theta,
 
     return (ym - y0 + tan_pente * x0 + tan_theta * xm) / denom;
 }
+
+static double intersect_H_x(double xm, double ym, double tan_theta,
+                           double x0, double y0, double tan_pente) {
+    /* Si tan_pente est très grand (interface quasiment verticale x=x0) */
+    if (fabs(tan_pente) > 1e14) {
+        return x0; /* hypothèse theta=pi/2 donc tan(pi/2)=inf */
+    }
+    /* Si tan_theta == tan_pente, droites parallèles */
+    double denom = -tan_pente + tan_theta;
+    if (fabs(denom) < 1e-30) return NAN;
+
+    return (ym - y0 - tan_pente * x0 + tan_theta * xm) / denom;
+}
+
 
 /* =========================================================
    Calcul de trajectoire
@@ -350,7 +364,7 @@ void calcul_trajectoire(
 
     /* --- Point 1 : entrée sur l'interface de droite (colonne J) --- */
     double xref = Maillage[I][J][0], yref = Maillage[I][J][1];
-    double x_M1 = intersect_x(x_p, y_p, tan(theta_echantillonne), xref, yref, tan_api);
+    double x_M1 = intersect_V_x(x_p, y_p, tan(theta_echantillonne), xref, yref, tan_api);
     double y_M1 = y_p + tan(theta_echantillonne) * (x_p - x_M1);
 
     ajouter_point_intersection(pts, x_M1, y_M1);
@@ -407,12 +421,50 @@ angles->data[angles->size]     =t;
 
 	
 
+		/*  Interface horizontale du bas */
+	    if (alpha>M_PI/2){ /*ce bloc doit être calculé au début que quand alpha>M_PI*/
+            if (!found) {
+                double xrh = Maillage[i][j-1][0], yrh = Maillage[i][j-1][1];
+                double xch= intersect_H_x(xm, ym, tan_theta, xrh, yrh, tan_api2);
+                double ych = ym + tan_theta * (xm - xch);
 
+                if (!isnan(xch) &&
+                    sur_segment(xch, ych, Maillage[i][j-1][0], Maillage[i][j-1][1], Maillage[i][j][0], Maillage[i][j][1])) {
+
+                    ajouter_point_intersection(pts, xch, ych);
+                    ajouter_point_maille(mailles, i_courant, j_courant);
+                    double d = sqrt(pow(xch-xm, 2) + pow(ych-ym, 2));
+                    ajouter_distance_maille(distance, d);
+
+                    /*Condition de sortie du maillage*/
+                    if (i==I){//fprintf(stderr, "Erreur : sortie du maillage (maille (%d, %d))\n", i, j);
+                            *exterieur_maillage = 1;
+                            //printf("exterieur_maillage = %d\n", *exterieur_maillage);
+                            for (int i=0; i<I*J; i++){Matrice_A_poids_pixel[0*(I*J) + i] = 0.;}
+
+                            Matrice_A_poids_pixel[0*(I*J) + 0] = 1.;/*repère pour indiquer que le rayon ne doit pas être pris en compte*/
+                    return;}
+
+                    m++;
+                    i_courant++;
+                    double th_in = angles->data[2*(m-2)];
+                    double n1 = N2(i_courant-1, j-1);
+                    double n2 = N2(i-1, j-1);
+                    if (verticale) calcul_angle_verti_hori_interface_basse(angles, alpha, th_in, theta_prime, n1, n2);
+                    else           calcul_angle_hori_hori (angles, alpha, th_in, theta_prime, n1, n2);
+                    Matrice_A_poids_pixel[0*(I*J) + I*(j-1) + i-1] = -d*Absorption[(i-1)*J+ j-1];
+                    verticale = 0;
+                    found = 1;
+                }
+            }
+	}
 
 /*  Interface verticale gauche : colonne j-1  */
             {   
                 double xrv = Maillage[i][j-1][0], yrv = Maillage[i][j-1][1];
-                double xc  = intersect_x(xm, ym, tan_theta, xrv, yrv, tan_api);
+                double xc;
+	        xc= intersect_V_x(xm, ym, tan_theta, xrv, yrv, tan_api);
+		
                 double yc  = ym + tan_theta * (xm - xc);
 
 		/* interface verticale haute */
@@ -513,7 +565,9 @@ angles->data[angles->size]     =t;
             /* Interface horizontale du haut */
             if (!found) {
                 double xrh = Maillage[i-1][j-1][0], yrh = Maillage[i-1][j-1][1];
-                double xch = intersect_x(xm, ym, tan_theta, xrh, yrh, tan_api2);
+                double xch;
+	        if (alpha<=M_PI/2){xch= intersect_V_x(xm, ym, tan_theta, xrh, yrh, tan_api2);}
+		else {xch= intersect_H_x(xm, ym, tan_theta, xrh, yrh, tan_api2);}
                 double ych = ym + tan_theta * (xm - xch);
 
                 if (!isnan(xch) &&
@@ -545,27 +599,28 @@ angles->data[angles->size]     =t;
                 }
             }
 
-            /*  Interface horizontale du bas */
+	        /*  Interface horizontale du bas */
+            if (alpha<=M_PI/2){ /*ce bloc doit être calculé à la fin que quand alpha<=M_PI*/
             if (!found) {
                 double xrh = Maillage[i][j-1][0], yrh = Maillage[i][j-1][1];
-                double xch = intersect_x(xm, ym, tan_theta, xrh, yrh, tan_api2);
+                double xch= intersect_V_x(xm, ym, tan_theta, xrh, yrh, tan_api2);
                 double ych = ym + tan_theta * (xm - xch);
 
                 if (!isnan(xch) &&
                     sur_segment(xch, ych, Maillage[i][j-1][0], Maillage[i][j-1][1], Maillage[i][j][0], Maillage[i][j][1])) {
 
-		    ajouter_point_intersection(pts, xch, ych);
-		    ajouter_point_maille(mailles, i_courant, j_courant);
-		    double d = sqrt(pow(xch-xm, 2) + pow(ych-ym, 2));
+                    ajouter_point_intersection(pts, xch, ych);
+                    ajouter_point_maille(mailles, i_courant, j_courant);
+                    double d = sqrt(pow(xch-xm, 2) + pow(ych-ym, 2));
                     ajouter_distance_maille(distance, d);
 
-		    /*Condition de sortie du maillage*/
+                    /*Condition de sortie du maillage*/
                     if (i==I){//fprintf(stderr, "Erreur : sortie du maillage (maille (%d, %d))\n", i, j);
-			    *exterieur_maillage = 1;
-			    //printf("exterieur_maillage = %d\n", *exterieur_maillage);
-			    for (int i=0; i<I*J; i++){Matrice_A_poids_pixel[0*(I*J) + i] = 0.;}
+                            *exterieur_maillage = 1;
+                            //printf("exterieur_maillage = %d\n", *exterieur_maillage);
+                            for (int i=0; i<I*J; i++){Matrice_A_poids_pixel[0*(I*J) + i] = 0.;}
 
-			    Matrice_A_poids_pixel[0*(I*J) + 0] = 1.;/*repère pour indiquer que le rayon ne doit pas être pris en compte*/
+                            Matrice_A_poids_pixel[0*(I*J) + 0] = 1.;/*repère pour indiquer que le rayon ne doit pas être pris en compte*/
                     return;}
 
                     m++;
@@ -576,10 +631,12 @@ angles->data[angles->size]     =t;
                     if (verticale) calcul_angle_verti_hori_interface_basse(angles, alpha, th_in, theta_prime, n1, n2);
                     else           calcul_angle_hori_hori (angles, alpha, th_in, theta_prime, n1, n2);
                     Matrice_A_poids_pixel[0*(I*J) + I*(j-1) + i-1] = -d*Absorption[(i-1)*J+ j-1];
-		    verticale = 0;
+                    verticale = 0;
                     found = 1;
                 }
             }
+        }
+
 
 
 
@@ -647,7 +704,7 @@ int main(void) {
     /* double h = 6.62607015e-34, c = 299792458., k = 1.380649e-23; */
 
     /*Itération Monte Carlo par pixel */
-    int N=5;
+    int N=1;
 
     /*mesure du temps d'exécution*/
     clock_t start, end;
@@ -675,7 +732,8 @@ int main(void) {
 
     /* ---- Capteur ---- */
     double x_p          = 0.1;
-    double y_Pmin       = -0.2975e-2, y_Pmax = 0.2975e-2;/*pour pi/6*/
+    double y_Pmin       = -0.525e-3, y_Pmax = 0.525e-3;/*pour 3 pixels*/
+    //double y_Pmin       = -0.2975e-2, y_Pmax = 0.2975e-2;/*pour pi/6*/
     //double y_Pmin       = -0.98e-2, y_Pmax = 0.98e-2;/*pour pi/4*/
     //double y_Pmin       = -2.3e-2, y_Pmax = 2.3e-2; /*pour pi/3*/ 
 
@@ -687,9 +745,9 @@ int main(void) {
     double hauteur_pixel       = (y_Pmax - y_Pmin) / nombre_pixels;*/
 
     /* ---- Échantillon ---- */
-    double alpha_min    = 1.*M_PI /6 ; /* rad */
+    double alpha_min    = 1.*M_PI /4 ; /* rad */
     double alpha_max    = 1.*M_PI / 3; /* rad */
-    int nombre_rotations    = 10;/*nombre de mesures = nombre_rotations +1 avec la position initiale*/ 
+    int nombre_rotations    = 0;/*nombre de mesures = nombre_rotations +1 avec la position initiale*/ 
     /* 15 pour avoir une écart de 1° entre pi/4 et pi/3 inclinaison*/
 
 
@@ -886,7 +944,7 @@ start = clock();
 	//printf("compteur = %d\n", compteur);
 		
 	/*printf("Mailles traversées (%d pts) :\n\n", mailles.size / 2);
-        print_array_maillage(&mailles);
+        print_array_maillage(&mailles);*/ /*
         printf("Points d'intersection (%d pts) :\n\n", pts.size / 2);
         print_array_points(&pts);*/
 	/*printf("Distance par mailles (%d distances) :\n\n", distance.size );
@@ -1024,11 +1082,11 @@ for (int i = 0; i < (nombre_pixels*(nombre_rotations+1)); i++) {for (int j = 0; 
         fprintf(f_A_std_pourcent_pixels, " %.6e; ", A_std_pixels_flat[i*(I*J)+j]);
     }fprintf(f_A_std_pourcent_pixels, "\n");}
 
-/*for (int i = 0; i < (nombre_pixels*(nombre_rotations+1)); i++) {
+for (int i = 0; i < (nombre_pixels*(nombre_rotations+1)); i++) {
 	double s = 0;
 	for (int j = 0; j < (I*J); j++) {s+=A_moyennes_pixels_flat[i*(I*J)+j];}
         fprintf(f_infos, " somme ligne : %.6e\n ", s);
-    }*/
+    }
 
 
 

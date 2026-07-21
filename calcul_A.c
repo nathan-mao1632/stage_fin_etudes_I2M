@@ -6,6 +6,14 @@
  *
  * code qui calcule la trajectoire en 2d de rayons dans un 
  * echantillon avec un maillage (I,J) de réfraction et absorption
+ *
+ * sorties : 
+ *
+ *   - Fichier infos.txt avec paramètres d'entrées du code
+ *
+ *   - Matrice des moyennes estimées (Matrice de passage A)
+ *
+ *   - Matrice des écart-types associés en pourcentage 
  * 
  *
  * A prendre en compte :
@@ -1083,11 +1091,12 @@ for (int i = 0; i < (nombre_pixels*(nombre_rotations+1)); i++) {for (int j = 0; 
         fprintf(f_A_std_pourcent_pixels, " %.6e; ", A_std_pixels_flat[i*(I*J)+j]);
     }fprintf(f_A_std_pourcent_pixels, "\n");}
 
-for (int i = 0; i < (nombre_pixels*(nombre_rotations+1)); i++) {
+/* Affichage des distances totales au travers de l'échantillon (peut servie de vérification pour le calcul des distances)*/ 
+/*for (int i = 0; i < (nombre_pixels*(nombre_rotations+1)); i++) {
 	double s = 0;
 	for (int j = 0; j < (I*J); j++) {s+=A_moyennes_pixels_flat[i*(I*J)+j];}
         fprintf(f_infos, " somme ligne : %.6e\n ", s);
-    }
+    }*/
 
 
 

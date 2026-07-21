@@ -2,15 +2,22 @@
  * INFOS GENERALES
  * =====================================================
  *
- * obj : calculer la matrice de passage A qui et le produit entre les distances au sein des mailles * dmu/dT
+ * objectif : calculer la matrice de passage A qui et le produit entre les distances au sein des mailles * dmu/dT ( sachant que dmu/dT supposé constant dans l'échantillon)
  *
  * code qui calcule la trajectoire en 2d de rayons dans un 
  * echantillon avec un maillage (I,J) de réfraction et absorption
- * au sein de chaque maille
+ * 
  *
- * A prendre en compte : 
- *   - Fonctionne pour inclinaison (alpha) entre 0 et pi
- *   - Choisir le bon champ de mu à comparer pour le calcul du poids (le faire automatiquement mais je l'ai pas fait encore)
+ * A prendre en compte :
+ *
+ *   - Fonctionne pour inclinaison de l'échantillon (alpha) variable sachant 
+ *   qu'un rayon qui rentre ou sort de l échantillon par les interfaces basses ou hautes 
+ *   ne sera pas pris en compte donc par exemple pour des inclinaisons proche de 0 il n
+ *   y aura pas de données exploitables à moins d'augmenter l'ordonnée des pixels ou de
+ *   mettre un angle d'arrivée des rayons inférieur à 0
+ *
+ *   - Choisir le bon champ de mu à comparer pour le calcul du poids mais la comparaison ét
+ *   ait plus facile sur matlab
  */
 
 
@@ -136,14 +143,12 @@ void calcul_angle_verti_verti(Tableau_dynamique_angles *arr, double alpha,
     grow_angles(arr);
     double t = asin(n_2 * sin(theta_2) / n_1);
     arr->data[arr->size]     = t;
-    if ((alpha >= M_PI/2) && (theta_prime<=0)){
+    if (alpha >= M_PI/2){
         arr->data[arr->size + 1] = -M_PI / 2 + alpha - t;}
-    if ((alpha >= M_PI/2) && (theta_prime>0)){
+    
+    if (alpha < M_PI/2){
         arr->data[arr->size + 1] = -M_PI / 2 + alpha - t;}
-    if ((alpha < M_PI/2) &&(theta_prime<=0)){
-        arr->data[arr->size + 1] = -M_PI / 2 + alpha - t;}
-    if ((alpha < M_PI/2) &&(theta_prime>0)){
-        arr->data[arr->size + 1] = -M_PI / 2 + alpha - t;}
+    
     arr->size += 2;
 }
 void calcul_angle_hori_verti_interface_haute(Tableau_dynamique_angles *arr, double alpha,
@@ -154,10 +159,9 @@ void calcul_angle_hori_verti_interface_haute(Tableau_dynamique_angles *arr, doub
     //pas possible d'avoir H-V haute quand (alpha>=M_PI/2) et (theta_prime<=0)
     if ((alpha>=M_PI/2) && (theta_prime>0)){
        arr->data[arr->size + 1] = -M_PI / 2 + alpha - t;}
-    if ((alpha<M_PI/2)&&(theta_prime<=0)){
+    if (alpha<M_PI/2){
        arr->data[arr->size + 1] = -M_PI / 2 + alpha - t;}
-    if ((alpha<M_PI/2)&&(theta_prime>0)){
-       arr->data[arr->size + 1] = -M_PI / 2 + alpha - t;} /*j'avais un plus avant mais marchait pas pour pi/3*/
+    
     arr->size += 2;
 }
 void calcul_angle_hori_verti_interface_basse(Tableau_dynamique_angles *arr, double alpha,
@@ -165,10 +169,9 @@ void calcul_angle_hori_verti_interface_basse(Tableau_dynamique_angles *arr, doub
     grow_angles(arr);
     double t = asin(n_2 * sin(M_PI / 2 - theta_2) / n_1);
     arr->data[arr->size]     = t;
-    if ((alpha>=M_PI/2) && (theta_prime<=0)){
+    if (alpha>=M_PI/2){
        arr->data[arr->size + 1] = -M_PI / 2 + alpha - t;}
-    if ((alpha>=M_PI/2) && (theta_prime>0)){
-       arr->data[arr->size + 1] = -M_PI / 2 + alpha - t;}
+    
     if ((alpha<M_PI/2)&&(theta_prime<=0)){
        arr->data[arr->size + 1] = -M_PI / 2 + alpha - t;}
     if ((alpha<M_PI/2)&&(theta_prime>0)){
@@ -181,10 +184,9 @@ void calcul_angle_verti_hori_interface_basse(Tableau_dynamique_angles *arr, doub
     grow_angles(arr);
     double t = asin(n_2 * sin(M_PI / 2 - theta_2) / n_1);
     arr->data[arr->size]     = t;
-    if ((alpha>=M_PI/2) && (theta_prime<=0)){
+    if (alpha>=M_PI/2){
        arr->data[arr->size + 1] = -M_PI + alpha - t;}
-    if ((alpha>=M_PI/2) && (theta_prime>0)){
-       arr->data[arr->size + 1] = -M_PI + alpha - t;}
+    
     if ((alpha<M_PI/2)&&(theta_prime<=0)){
        arr->data[arr->size + 1] = -M_PI+ alpha - t;}
     //pas possible d'avoir V-H basse quand (alpha>=M_PI/2) et (theta_prime>=0)
@@ -198,10 +200,9 @@ void calcul_angle_verti_hori_interface_haute(Tableau_dynamique_angles *arr, doub
     //pas possible d'avoir V-H haute quand (alpha>=M_PI/2) et (theta_prime<=0)
     if ((alpha>=M_PI/2) && (theta_prime>0)){
        arr->data[arr->size + 1] =   alpha - t;}
-    if ((alpha<M_PI/2)&&(theta_prime<=0)){
+    if (alpha<M_PI/2){
        arr->data[arr->size + 1] =  alpha - t;}
-    if ((alpha<M_PI/2)&&(theta_prime>0)){
-       arr->data[arr->size + 1] =  alpha - t;}
+    
     arr->size += 2;
 }
 void calcul_angle_hori_hori(Tableau_dynamique_angles *arr, double alpha,
@@ -209,14 +210,12 @@ void calcul_angle_hori_hori(Tableau_dynamique_angles *arr, double alpha,
     grow_angles(arr);
     double t = asin(n_2 * sin(theta_2) / n_1);
     arr->data[arr->size]     = t;
-    if ((alpha>=M_PI/2) && (theta_prime<=0)){
+    if (alpha>=M_PI/2){
        arr->data[arr->size + 1] = -M_PI + alpha - t;}
-    if ((alpha>=M_PI/2) && (theta_prime>0)){
-       arr->data[arr->size + 1] = -M_PI + alpha - t;}
-    if ((alpha < M_PI/2) &&(theta_prime<=0)){
+    
+    if (alpha < M_PI/2){
         arr->data[arr->size + 1] =  alpha - t;}
-    if ((alpha < M_PI/2) &&(theta_prime>0)){
-        arr->data[arr->size + 1] = alpha - t;}
+    
     arr->size += 2;
 }
 
@@ -423,7 +422,7 @@ angles->data[angles->size]     =t;
 
 		/*  Interface horizontale du bas */
 	    if (alpha>M_PI/2){ /*ce bloc doit être calculé au début que quand alpha>M_PI*/
-            if (!found) {
+            if (!found )  { 
                 double xrh = Maillage[i][j-1][0], yrh = Maillage[i][j-1][1];
                 double xch= intersect_H_x(xm, ym, tan_theta, xrh, yrh, tan_api2);
                 double ych = ym + tan_theta * (xm - xch);
@@ -646,8 +645,8 @@ angles->data[angles->size]     =t;
                     m, i_courant, j_courant, theta_prime);
             return;
         }
-        // Sécurité anti-boucle infinie 
-        if (m > I * J * 4 + 10) {
+        // Sécurité boucle infinie 
+        if (m > I * J * 4 ) {
             fprintf(stderr, "  Trop d'itérations, arrêt forcé.\n");
             return;
         }
@@ -704,7 +703,7 @@ int main(void) {
     /* double h = 6.62607015e-34, c = 299792458., k = 1.380649e-23; */
 
     /*Itération Monte Carlo par pixel */
-    int N=1;
+    int N=100;
 
     /*mesure du temps d'exécution*/
     clock_t start, end;
@@ -732,20 +731,21 @@ int main(void) {
 
     /* ---- Capteur ---- */
     double x_p          = 0.1;
-    double y_Pmin       = -0.525e-3, y_Pmax = 0.525e-3;/*pour 3 pixels*/
+    //double y_Pmin       = -0.175e-3, y_Pmax = 0.175e-3;/*pour 1 pixels*/
+    //double y_Pmin       = -0.525e-3, y_Pmax = 0.525e-3;/*pour 3 pixels*/
     //double y_Pmin       = -0.2975e-2, y_Pmax = 0.2975e-2;/*pour pi/6*/
-    //double y_Pmin       = -0.98e-2, y_Pmax = 0.98e-2;/*pour pi/4*/
+    double y_Pmin       = -0.98e-2, y_Pmax = 0.98e-2;/*pour pi/4*/
     //double y_Pmin       = -2.3e-2, y_Pmax = 2.3e-2; /*pour pi/3*/ 
 
     double theta_echantillonne =0. * M_PI / 180; /* rad */
     double hauteur_pixel = 0.35e-3; /*m*/
-    //double hauteur_pixel = 1.4e-3;  /*m*/
+    //double hauteur_pixel = 2.8e-3;  /*m*/
 
     /*int    nombre_pixels      = 10;
     double hauteur_pixel       = (y_Pmax - y_Pmin) / nombre_pixels;*/
 
     /* ---- Échantillon ---- */
-    double alpha_min    = 1.*M_PI /4 ; /* rad */
+    double alpha_min    = 1.*M_PI /10 ; /* rad */
     double alpha_max    = 1.*M_PI / 3; /* rad */
     int nombre_rotations    = 0;/*nombre de mesures = nombre_rotations +1 avec la position initiale*/ 
     /* 15 pour avoir une écart de 1° entre pi/4 et pi/3 inclinaison*/
@@ -799,9 +799,9 @@ int main(void) {
         Abs_flat[i*J+j] =-1000.;// mu_par_colonne[j];
     }
 
-    /*double n_par_colonne[J];   // exemple, un indice par colonne
+    double n_par_colonne[J];   // exemple, un indice par colonne
     n_par_colonne[0] = 1.5;
-    n_par_colonne[1] = 1.49;
+    /*n_par_colonne[1] = 1.49;
     n_par_colonne[2] = 1.48;
     n_par_colonne[3] = 1.47;
     n_par_colonne[4] = 1.46;
@@ -811,6 +811,7 @@ int main(void) {
     n_par_colonne[8] = 1.42;
     n_par_colonne[9] = 1.41;
     n_par_colonne[10] = 1.4;*/
+    //for (int i=0; i<J-1; i++){n_par_colonne[i+1]= n_par_colonne[i] - 2.5e-3;}
     for (int i = 0; i < I; i++) for (int j = 0; j < J; j++) {
         Ref_flat[i*J+j]    = malloc(sizeof(double));
         Ref_flat[i*J+j][0] = n_2;//n_par_colonne[j];
@@ -944,8 +945,8 @@ start = clock();
 	//printf("compteur = %d\n", compteur);
 		
 	/*printf("Mailles traversées (%d pts) :\n\n", mailles.size / 2);
-        print_array_maillage(&mailles);*/ /*
-        printf("Points d'intersection (%d pts) :\n\n", pts.size / 2);
+        print_array_maillage(&mailles);*/ 
+        /*printf("Points d'intersection (%d pts) :\n\n", pts.size / 2);
         print_array_points(&pts);*/
 	/*printf("Distance par mailles (%d distances) :\n\n", distance.size );
         print_array_distance_mailles(&distance);*//*
